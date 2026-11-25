@@ -1,0 +1,30 @@
+name: RouterLive
+options:
+  bundleIdPrefix: com.route.monitor
+  deploymentTarget:
+    iOS: "15.0"
+  xcodeVersion: "15.0"
+  createIntermediateGroups: true
+settings:
+  SWIFT_VERSION: "5.0"
+  TARGETED_DEVICE_FAMILY: "1,2"
+  CODE_SIGNING_ALLOWED: NO
+  CODE_SIGNING_REQUIRED: NO
+  SKIP_INSTALL: NO
+targets:
+  RouterLive:
+    type: application
+    platform: iOS
+    sources:
+      - path: RouterLive
+    info:
+      properties:
+        CFBundleDisplayName: 路由器监控
+        CFBundleName: RouterLive
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        NSLocalNetworkUsageDescription: 需要访问局域网路由器以读取实时流量数据
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+          NSAllowsArbitraryLoads: true
