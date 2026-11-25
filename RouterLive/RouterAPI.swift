@@ -209,8 +209,14 @@ public final class RouterLiveDataProvider {
 
         // 1) 取认证挑战：两行一组，第一行含非数字且长度>=6，第二行长度>20
         let challengeText = await post("?code=2&asyn=1", body: "")
-        let lines = challengeText.components(separatedBy: .newlines)
+        // 路由器返回 CRLF；必须用与 JS /\r?\n/ 相同的方式归一化，
+        // 否则 .newlines 会把 \r\n 拆成两行（中间夹空行），相邻两行配对失败。
+        let normalizedChallenge = challengeText
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+        let lines = normalizedChallenge.components(separatedBy: "\n")
         log("挑战响应: 行数=\(lines.count) 长度=\(challengeText.count)")
+        log("挑战原文: \(String(challengeText.prefix(200)))")
         var challenge = "", key = ""
         if lines.count >= 2 {
             for i in 0..<(lines.count - 1) {
@@ -243,7 +249,10 @@ public final class RouterLiveDataProvider {
     /// 解析 "FIELD [idx] value" 文本；无索引字段存到键 0。
     private func parseBlock(_ text: String) -> [String: [Int: String]] {
         var out: [String: [Int: String]] = [:]
-        for raw in text.components(separatedBy: .newlines) {
+        let normalized = text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+        for raw in normalized.components(separatedBy: "\n") {
             let line = String(raw)
             let ns = line as NSString
             guard let m = Self.blockLine.firstMatch(
