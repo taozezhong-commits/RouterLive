@@ -13,6 +13,7 @@ import Foundation
 final class RouterViewModel: ObservableObject {
     @Published var snapshot: RouterSnapshot?
     @Published var errorMessage: String?
+    @Published var debugText = ""
     @Published var isRunning = false
 
     private var provider: RouterLiveDataProvider?
@@ -21,11 +22,18 @@ final class RouterViewModel: ObservableObject {
         stop()
         let cfg = RouterConfig(host: host, password: password)
         let p = RouterLiveDataProvider(config: cfg)
-        p.onData = { [weak self] snap in
-            DispatchQueue.main.async { self?.snapshot = snap; self?.errorMessage = nil }
+        p.onData = { [weak self, weak p] snap in
+            DispatchQueue.main.async {
+                self?.snapshot = snap
+                self?.errorMessage = nil
+                self?.debugText = p?.debugLog ?? ""
+            }
         }
-        p.onError = { [weak self] msg in
-            DispatchQueue.main.async { self?.errorMessage = msg }
+        p.onError = { [weak self, weak p] msg in
+            DispatchQueue.main.async {
+                self?.errorMessage = msg
+                self?.debugText = p?.debugLog ?? ""
+            }
         }
         p.start()
         provider = p
@@ -60,11 +68,19 @@ struct ContentView: View {
                         }
                         Spacer()
                         if let e = vm.errorMessage {
-                            Text(e).font(.caption).foregroundColor(.red).lineLimit(1)
+                            Text(e).font(.caption).foregroundColor(.red).lineLimit(2)
                         } else if vm.isRunning {
                             Text("已连接 · 1.5s 刷新").font(.caption).foregroundColor(.green)
                         }
                     }
+                }
+
+                Section("连接诊断（失败时请截图这一块）") {
+                    Text("首次打开若弹出“本地网络”权限，请点允许；若已拒绝，到 iPhone 设置 → 隐私与安全性 → 本地网络 → 打开“路由器监控”。")
+                        .font(.caption2).foregroundColor(.secondary)
+                    Text(vm.debugText.isEmpty ? "尚未发起请求" : vm.debugText)
+                        .font(.caption2).monospacedDigit()
+                        .textSelection(.enabled)
                 }
 
                 Section("WAN 实时速率") {
