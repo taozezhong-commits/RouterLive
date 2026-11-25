@@ -101,6 +101,12 @@ public final class RouterLiveDataProvider {
     private var task: Task<Void, Never>?
     private let lock = NSLock()
 
+    /// 最近请求过程，供界面显示诊断信息（不超过 2000 字符）
+    public private(set) var debugLog = ""
+    private func log(_ line: String) {
+        debugLog = String((debugLog + line + "\n").suffix(2000))
+    }
+
     private static let userAgent = "Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1"
     private static let blockLine = try! NSRegularExpression(
         pattern: #"^([A-Za-z][A-Za-z0-9_]*)(?:\s+(\d+))?\s+(.*)$"#)
@@ -153,11 +159,15 @@ public final class RouterLiveDataProvider {
         req.setValue("http://" + config.host + "/", forHTTPHeaderField: "Referer")
         if let body { req.httpBody = body.data(using: .utf8) }
         do {
-            let (data, _) = try await URLSession.shared.data(for: req)
-            return String(data: data, encoding: .utf8)
+            let (data, response) = try await URLSession.shared.data(for: req)
+            let text = String(data: data, encoding: .utf8)
                 ?? String(data: data, encoding: .isoLatin1)
                 ?? ""
+            let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+            log("POST \(path) HTTP=\(code) len=\(text.count) head=\(String(text.prefix(60)))")
+            return text
         } catch {
+            log("POST \(path) 网络错误: \(error.localizedDescription)")
             return ""
         }
     }
@@ -200,6 +210,7 @@ public final class RouterLiveDataProvider {
         // 1) 取认证挑战：两行一组，第一行含非数字且长度>=6，第二行长度>20
         let challengeText = await post("?code=2&asyn=1", body: "")
         let lines = challengeText.components(separatedBy: .newlines)
+        log("挑战响应: 行数=\(lines.count) 长度=\(challengeText.count)")
         var challenge = "", key = ""
         if lines.count >= 2 {
             for i in 0..<(lines.count - 1) {
@@ -211,6 +222,7 @@ public final class RouterLiveDataProvider {
                 }
             }
         }
+        log("解析结果: challenge=\(String(challenge.prefix(10))) key长度=\(key.count)")
         guard !challenge.isEmpty, !key.isEmpty else { throw RouterAPIError.noChallenge }
 
         // 2) 密码预编码，再与挑战做第二次编码得到 session
@@ -219,6 +231,7 @@ public final class RouterLiveDataProvider {
 
         // 3) 提交 session，返回必须以 "00000" 开头
         let result = await post("?code=7&asyn=0&id=" + pct(session), body: "")
+        log("登录响应: \(String(result.prefix(30)))")
         guard result.hasPrefix("00000") else { throw RouterAPIError.authFailed }
 
         cachedSession = session
@@ -255,6 +268,7 @@ public final class RouterLiveDataProvider {
 
     private func readBlock(_ session: String, _ id: Int) async throws -> [String: [Int: String]] {
         let text = await post("?code=2&asyn=0&id=" + pct(session), body: "id \(id)\r\n")
+        log("数据块 \(id) 响应: \(String(text.prefix(30)))")
         guard text.hasPrefix("00000") else { throw RouterAPIError.blockFailed(id) }
         return parseBlock(text)
     }
