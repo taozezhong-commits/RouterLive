@@ -18,6 +18,7 @@ targets:
     sources:
       - path: RouterLive
     info:
+      path: Info.plist
       properties:
         CFBundleDisplayName: 路由器监控
         CFBundleName: RouterLive
